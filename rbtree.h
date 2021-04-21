@@ -49,13 +49,13 @@ typedef struct rbtree_node_t {
 
 typedef struct rbtree_head_t {
     struct rbtree_node_t *head;
-    int64_t (*compare_function) (void *, void *, void *);
+    int (*compare_function) (void *, void *, void *);
     void *token;
     unsigned int size;
 } *rbtree;
 #endif
 
-rbtree rb_init(int64_t (*)(void *, void *, void *), void *);
+rbtree rb_init(int (*)(void *, void *, void *), void *);
 void rb_destroy(rbtree);
 
 void rb_insert(rbtree, void *, void *); 

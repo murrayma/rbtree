@@ -1,9 +1,9 @@
-/* 
+/*
  * rbtree.c - a redblack tree implementation
  *
  * Copyright (c) 2004,2005 Martin Murray <martin.murray@gmail.com>
  * All rights reserved.
- * 
+ *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -14,9 +14,8 @@
  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.      
- * 
- * $Id $
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
  */
 
 #include <stdio.h>
@@ -52,12 +51,12 @@ typedef struct rbtree_node_t {
 
 typedef struct rbtree_head_t {
     struct rbtree_node_t *head;
-    int64_t (*compare_function) (void *, void *, void *);
+    int (*compare_function) (void *, void *, void *);
     void *token;
     unsigned int size;
 } *rbtree;
 
-rbtree rb_init(int64_t (*)(void *, void *, void *), void *);
+rbtree rb_init(int (*)(void *, void *, void *), void *);
 void rb_destroy(rbtree);
 
 void rb_insert(rbtree, void *key, void *data);
@@ -70,7 +69,11 @@ unsigned int rb_size(rbtree);
 void *rb_search(rbtree, int, void *);
 #endif
 
-rbtree rb_init(int64_t (*compare_function) (void *, void *, void *), void *token)
+#define rbann(format, args...) printf("%d: " format "\n", __LINE__, ##args)
+#define rbfail(format, args...) do { fprintf(stderr, "%d: " format "\n", __LINE__, ##args); abort(); } while (0)
+
+
+rbtree rb_init(int (*compare_function) (void *, void *, void *), void *token)
 {
     rbtree temp;
 
@@ -172,8 +175,7 @@ void rb_release(rbtree bt, void (*release) (void *, void *, void *),
                 else if(parent && parent->right == node)
                     parent->right = NULL;
                 else if(parent) {
-                    fprintf(stderr, "serious braindamage.\n");
-                    exit(1);
+		    rbfail("abject failure.");
                 }
                 release(node->key, node->data, arg);
                 free(node);
@@ -205,8 +207,7 @@ void rb_destroy(rbtree bt)
                 else if(parent && parent->right == node)
                     parent->right = NULL;
                 else if(parent) {
-                    fprintf(stderr, "serious braindamage.\n");
-                    exit(1);
+		    rbfail("abject failure.");
                 }
                 free(node);
                 node = parent;
@@ -291,7 +292,7 @@ void rb_insert(rbtree bt, void *key, void *data)
 {
     rbtree_node *node;
     rbtree_node *iter;
-    int64_t compare_result;
+    int compare_result;
 
     if(!bt->head) {
         bt->head = rb_allocate(NULL, key, data);
@@ -415,7 +416,7 @@ void rb_insert(rbtree bt, void *key, void *data)
 void *rb_find(rbtree bt, void *key)
 {
     rbtree_node *node;
-    int64_t compare_result;
+    int compare_result;
 
     if(!bt->head) {
         return NULL;
@@ -441,14 +442,14 @@ void *rb_find(rbtree bt, void *key)
         }
     }
     /* Shouldn't happen. */
-    fprintf(stderr, "Serious fault in rbtree.c:rb_find!\n");
+    rbfail("Serious fault in rbtree.c:rb_find!");
     exit(1);
 }
 
 int rb_exists(rbtree bt, void *key)
 {
     rbtree_node *node;
-    int64_t compare_result;
+    int compare_result;
     if(!bt->head) {
         return 0;
     }
@@ -473,12 +474,9 @@ int rb_exists(rbtree bt, void *key)
         }
     }
     /* Shouldn't happen. */
-    fprintf(stderr, "Serious fault in rbtree.c:rb_exists!\n");
+    rbfail("Serious fault in rbtree.c:rb_exists!");
     exit(1);
 }
-
-#define rbann(format, args...) printf("%d: " format "\n", __LINE__, ##args)
-#define rbfail(format, args...) do { printf("%d: " format "\n", __LINE__, ##args); abort(); } while (0)
 
 static void rb_unlink_leaf(rbtree bt, rbtree_node * leaf)
 {
@@ -513,7 +511,7 @@ static void rb_unlink_leaf(rbtree bt, rbtree_node * leaf)
             if(node->left->color == NODE_RED) {
                 node->left->color = NODE_BLACK;
             } else {
-                rbfail("shit.");
+                rbfail("tree inconsistent!");
             }
         }
         node->parent = NULL;
@@ -536,13 +534,14 @@ static void rb_unlink_leaf(rbtree bt, rbtree_node * leaf)
             if(node->right->color == NODE_RED) {
                 node->right->color = NODE_BLACK;
             } else {
-                rbfail("shit.");
+                rbfail("tree inconsistent!");
             }
         }
         node->right = NULL;
         node->left = NULL;
         return;
     }
+
     // node is black and has no children, if it had two children, then rb_delete
     // would have handled the situation. Since the node is black and has no
     // children, things get complicated.
@@ -559,7 +558,7 @@ static void rb_unlink_leaf(rbtree bt, rbtree_node * leaf)
         // since we are a child, we're guaranteed a sibling.
         if(!sibling)			// Sanity Check
             rbfail
-                ("serious braindamage: black child of black parent has no sibling.");
+                ("inconsistency: black child of black parent has no sibling.");
         if(node->parent->color == NODE_BLACK && sibling->color == NODE_BLACK
                 && (!sibling->right || sibling->right->color == NODE_BLACK)
                 && (!sibling->left || sibling->left->color == NODE_BLACK)) {
@@ -654,7 +653,7 @@ done:
     } else if(leaf->parent->right == leaf) {
         leaf->parent->right = NULL;
     } else {
-        rbfail("major braindamage.");
+        rbfail("child node not descendent of parent node!");
     }
     return;
 }
@@ -663,7 +662,7 @@ void *rb_delete(rbtree bt, void *key)
 {
     rbtree_node *node = NULL, *child = NULL, *tail;
     void *data;
-    int64_t compare_result;
+    int compare_result;
 
     if(!bt->head) {
         return NULL;
@@ -796,7 +795,7 @@ unsigned int rb_size(rbtree bt)
 void *rb_search(rbtree bt, int method, void *key)
 {
     rbtree_node *node, *last;
-    int64_t compare_result;
+    int compare_result;
     int found = 0;
 
     if(!bt->head) {
@@ -913,5 +912,5 @@ void *rb_index(rbtree bt, int index)
             iter = iter->right;
         }
     }
-    rbfail("major braindamage.");
+    rbfail("inconsistency!");
 }
